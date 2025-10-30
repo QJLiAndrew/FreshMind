@@ -1,0 +1,19 @@
+### Test root endpoint
+GET http://localhost:8000/
+Accept: application/json
+
+### Test health check
+GET http://localhost:8000/health
+Accept: application/json
+
+### Test Open Food Facts - Scan barcode
+GET http://localhost:8000/api/barcode/737628064502
+Accept: application/json
+
+### Test Edamam - Search food
+GET http://localhost:8000/api/food/search?query=apple
+Accept: application/json
+
+### Test USDA - Search foods
+GET http://localhost:8000/api/usda/search?query=chicken breast
+Accept: application/json
