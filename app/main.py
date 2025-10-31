@@ -2,8 +2,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.database import engine, Base
 
-# Import routers (we'll create these next)
-# from app.routers import inventory, recipes, grocery
+from app.routers import inventory
+app.include_router(inventory.router)
 
 # Create database tables
 Base.metadata.create_all(bind=engine)

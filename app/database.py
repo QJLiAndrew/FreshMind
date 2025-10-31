@@ -4,6 +4,11 @@ from sqlalchemy.orm import sessionmaker
 from pydantic_settings import BaseSettings
 from functools import lru_cache
 from typing import Optional
+from pathlib import Path
+
+
+# Get the project root directory
+BASE_DIR = Path(__file__).resolve().parent.parent
 
 
 class Settings(BaseSettings):
@@ -20,8 +25,11 @@ class Settings(BaseSettings):
     usda_api_key: Optional[str] = None
 
     class Config:
-        env_file = ".env"
+        # Explicit path to .env file
+        env_file = str(BASE_DIR / ".env")
+        env_file_encoding = 'utf-8'
         extra = "ignore"
+        case_sensitive = False  # Allow DATABASE_URL or database_url
 
 
 @lru_cache()
@@ -31,8 +39,13 @@ def get_settings():
 
 settings = get_settings()
 
-# Create database engine
-engine = create_engine(settings.database_url)
+# Create database engine with connection pooling
+engine = create_engine(
+    settings.database_url,
+    pool_pre_ping=True,  # Verify connections before using
+    pool_size=10,
+    max_overflow=20
+)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 # Base class for models
@@ -46,3 +59,16 @@ def get_db():
         yield db
     finally:
         db.close()
+
+
+# Initialize database tables
+def init_db():
+    """Create all tables in the database"""
+    # Import all models to ensure they're registered with Base
+    from app.models import (
+        User, FoodItemMaster, Allergen, FoodItemAllergen,
+        UserInventory, RecipeMaster, RecipeIngredient,
+        RecipeAllergen, UserGroceryList
+    )
+    Base.metadata.create_all(bind=engine)
+    print("✅ Database tables created successfully!")
