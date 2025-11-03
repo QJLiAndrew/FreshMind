@@ -4,8 +4,8 @@ Matches the PostgreSQL schema defined in create_database.sql
 """
 
 from sqlalchemy import (
-    Column, String, Integer, Float, Boolean, Text, Date, DateTime,
-    ForeignKey, CheckConstraint, func, DECIMAL
+    Column, Numeric, String, Integer, Float, Boolean, Text, Date, DateTime,
+    ForeignKey, CheckConstraint, func, DECIMAL, text
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
