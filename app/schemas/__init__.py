@@ -198,7 +198,7 @@ class BarcodeScanResponse(BaseModel):
 
 # Request schemas
 class RecipeIngredientCreate(BaseModel):
-    food_id: UUID
+    food_id: UUID4
     quantity: float
     unit: str
     ingredient_note: Optional[str] = None
@@ -244,8 +244,8 @@ class RecipeUpdate(BaseModel):
 
 # Response schemas
 class RecipeIngredientResponse(BaseModel):
-    recipe_ingredient_id: UUID
-    food_id: UUID
+    recipe_ingredient_id: UUID4
+    food_id: UUID4
     food_name: str  # Joined from food_items_master
     quantity: float
     unit: str
@@ -258,7 +258,7 @@ class RecipeIngredientResponse(BaseModel):
 
 
 class RecipeResponse(BaseModel):
-    recipe_id: UUID
+    recipe_id: UUID4
     recipe_name: str
     description: Optional[str]
     cuisine_type: Optional[str]
