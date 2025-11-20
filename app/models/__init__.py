@@ -19,6 +19,9 @@ from app.database import Base
 # ============================================
 # 1. USERS MODEL
 # ============================================
+# ============================================
+# 1. USERS MODEL (Updated with Dietary Profile)
+# ============================================
 class User(Base):
     __tablename__ = "users"
 
@@ -26,6 +29,19 @@ class User(Base):
     username = Column(String(100), unique=True, nullable=False, index=True)
     email = Column(String(255), unique=True, nullable=False, index=True)
     unit_preference = Column(String(10), default='metric')
+
+    # --- NEW: Dietary Preferences ---
+    is_vegan = Column(Boolean, default=False)
+    is_vegetarian = Column(Boolean, default=False)
+    is_gluten_free = Column(Boolean, default=False)
+    is_dairy_free = Column(Boolean, default=False)
+    is_halal = Column(Boolean, default=False)
+    is_kosher = Column(Boolean, default=False)
+
+    # --- NEW: Nutritional Goals (Daily) ---
+    daily_calorie_goal = Column(Integer, default=2000)
+    daily_protein_goal = Column(Integer, default=50)  # grams
+
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

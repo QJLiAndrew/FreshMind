@@ -2,3 +2,7 @@
 .env
 *.pyc
 *.sql
+dummy_data.txt
+reset_db.py
+app/test_keys.py
+app/create_user.py

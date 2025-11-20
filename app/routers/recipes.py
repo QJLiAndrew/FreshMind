@@ -22,7 +22,10 @@ from app.schemas import (
     SaveRecipeRequest
 )
 
+from app.services.edamam import EdamamRecipeService
+
 router = APIRouter(prefix="/api/recipes", tags=["recipes"])
+edamam_service = EdamamRecipeService()
 
 """
 Helper functions for recipe router
@@ -431,101 +434,6 @@ async def list_recipes(
     return result
 
 
-@router.get("/{recipe_id}", response_model=RecipeResponse)
-async def get_recipe(
-        recipe_id: str,
-        db: Session = Depends(get_db)
-):
-    """
-    Get detailed recipe information
-
-    **Returns:**
-    - Complete recipe details
-    - Full ingredient list with food names and quantities
-    - List of allergens present
-    - Nutritional information (total and per serving)
-    - Cooking instructions
-
-    **Errors:**
-    - 404: Recipe not found
-    """
-    # TODO: Implementation
-    # 1. Query recipe by UUID
-    # 2. Eager load ingredients (with food_items_master join for names)
-    # 3. Eager load allergens
-    # 4. Return 404 if not found
-    # 5. Return RecipeResponse
-    raise HTTPException(status_code=501, detail="Not implemented yet")
-
-
-@router.put("/{recipe_id}", response_model=RecipeResponse)
-async def update_recipe(
-        recipe_id: str,
-        updates: RecipeUpdate,
-        user_id: str = Query(..., description="User ID updating the recipe"),
-        db: Session = Depends(get_db)
-):
-    """
-    Update a custom recipe
-
-    **Authorization:**
-    - Only the user who created the recipe can update it
-    - Edamam-imported recipes (data_source='edamam') cannot be modified
-
-    **Partial Updates:**
-    - Only fields provided in request will be updated
-    - Ingredients list can be replaced entirely
-    - Allergens will be recalculated if ingredients change
-
-    **Errors:**
-    - 404: Recipe not found
-    - 403: User doesn't own recipe or recipe is from Edamam
-    """
-    # TODO: Implementation
-    # 1. Query existing recipe
-    # 2. Verify user owns recipe (check data_source='user_custom')
-    # 3. Update only provided fields
-    # 4. If ingredients updated, delete old and create new recipe_ingredients
-    # 5. Recalculate nutritional values if servings or ingredients changed
-    # 6. Update updated_at timestamp
-    # 7. Return updated RecipeResponse
-    raise HTTPException(status_code=501, detail="Not implemented yet")
-
-
-@router.delete("/{recipe_id}", status_code=204)
-async def delete_recipe(
-        recipe_id: str,
-        user_id: str = Query(..., description="User ID deleting the recipe"),
-        db: Session = Depends(get_db)
-):
-    """
-    Delete a custom recipe
-
-    **Authorization:**
-    - Only the user who created the recipe can delete it
-    - Edamam-imported recipes cannot be deleted (only unsaved)
-
-    **Cascade:**
-    - Automatically deletes associated recipe_ingredients
-    - Automatically deletes associated recipe_allergens
-    - Removes from user_saved_recipes for all users
-
-    **Errors:**
-    - 404: Recipe not found
-    - 403: User doesn't own recipe or recipe is from Edamam
-    """
-    # TODO: Implementation
-    # 1. Query existing recipe
-    # 2. Verify user owns recipe (data_source='user_custom')
-    # 3. Delete recipe (cascades to ingredients and allergens)
-    # 4. Return 204 No Content
-    raise HTTPException(status_code=501, detail="Not implemented yet")
-
-
-# ============================================
-# SMART RECOMMENDATIONS
-# ============================================
-
 @router.get("/recommend", response_model=List[RecipeMatchScore])
 async def recommend_recipes_from_inventory(
         user_id: str = Query(..., description="User ID"),
@@ -674,101 +582,45 @@ async def recommend_recipes_from_inventory(
     return recommendations[:limit]
 
 
-# ============================================
-# EDAMAM INTEGRATION
-# ============================================
-
-@router.post("/import/edamam", response_model=RecipeResponse)
-async def import_from_edamam(
-        edamam_uri: str = Query(..., description="Edamam recipe URI"),
-        user_id: str = Query(..., description="User ID importing the recipe"),
-        db: Session = Depends(get_db)
-):
-    """
-    Import a recipe from Edamam API into local database
-
-    **Process:**
-    1. Check if recipe already imported (check edamam_recipe_uri)
-    2. If already exists, return existing recipe
-    3. If not exists:
-       a. Fetch recipe details from Edamam API
-       b. Map Edamam data to recipes_master schema
-       c. For each ingredient:
-          - Search food_items_master by name
-          - If not found, create new food item
-          - Create recipe_ingredient entry
-       d. Map dietary labels to dietary flags
-       e. Identify allergens from ingredients
-       f. Save recipe with data_source='edamam'
-
-    **Data Mapping:**
-    - Edamam labels → dietary flags (e.g., "Vegan" → is_vegan=true)
-    - Edamam healthLabels → allergen identification
-    - Edamam ingredients → recipe_ingredients + food_items_master
-
-    **Use Cases:**
-    - User finds recipe on Edamam search, wants to save it
-    - User wants to add external recipes to their collection
-    - Bulk import of curated recipe collection
-
-    **Errors:**
-    - 400: Invalid Edamam URI format
-    - 404: Recipe not found on Edamam
-    - 502: Edamam API error or timeout
-    """
-    # TODO: Implementation
-    # 1. Validate edamam_uri format
-    # 2. Check if already imported
-    # 3. Call Edamam API to fetch recipe
-    # 4. Map Edamam response to RecipeCreate schema
-    # 5. For each ingredient:
-    #    - Query or create food_items_master entry
-    # 6. Create recipe in recipes_master
-    # 7. Create recipe_ingredients entries
-    # 8. Link allergens
-    # 9. Return RecipeResponse
-    raise HTTPException(status_code=501, detail="Not implemented yet")
-
-
 @router.get("/search/external")
 async def search_external_recipes(
         query: str = Query(..., description="Search query"),
-
-        # Filters
-        dietary_restrictions: Optional[List[str]] = Query(None, description="Dietary restrictions (vegan, etc.)"),
-        cuisine_type: Optional[str] = Query(None, description="Cuisine type"),
-        meal_type: Optional[str] = Query(None, description="Meal type"),
-        max_calories: Optional[int] = Query(None, description="Maximum calories"),
-        exclude_allergens: Optional[List[int]] = Query(None, description="Allergen IDs to exclude"),
-
-        # Pagination
-        limit: int = Query(20, ge=1, le=100, description="Number of results"),
-
+        dietary_restrictions: Optional[List[str]] = Query(None),
+        cuisine_type: Optional[str] = Query(None),
+        meal_type: Optional[str] = Query(None),
+        limit: int = 20,
         db: Session = Depends(get_db)
 ):
     """
-    Search recipes from Edamam API without importing
-
-    **Purpose:**
-    - Preview recipes before importing
-    - Browse external recipe database
-    - Find recipes to add to collection
-
-    **Response:**
-    - Raw Edamam results (not in database yet)
-    - Each result includes "import_uri" for importing later
-    - Formatted for preview in UI
-
-    **Next Steps:**
-    - User can call POST /import/edamam with the URI to save recipe
+    Search recipes from Edamam API.
+    Returns raw Edamam results formatted for preview.
     """
-    # TODO: Implementation
-    # 1. Build Edamam API request with filters
-    # 2. Make HTTP request to Edamam
-    # 3. Parse response
-    # 4. Format results for preview
-    # 5. Return raw results (List[Dict])
-    raise HTTPException(status_code=501, detail="Not implemented yet")
+    results = await edamam_service.search_recipes(
+        query=query,
+        health=dietary_restrictions,
+        cuisine_type=cuisine_type,
+        meal_type=meal_type
+    )
+
+    if not results or "hits" not in results:
+        return []
+
+    formatted_results = []
+    for hit in results["hits"]:
+        recipe = hit["recipe"]
+        formatted_results.append({
+            "recipe_name": recipe["label"],
+            "image_url": recipe["image"],
+            "source_url": recipe["url"],
+            "calories": round(recipe["calories"]),
+            "servings": recipe["yield"],
+            "ingredients_count": len(recipe["ingredients"]),
+            "diet_labels": recipe["dietLabels"] + recipe["healthLabels"],
+            # Send the URI so the frontend can call /import with it
+            "import_uri": recipe["uri"]
+        })
+
+    return formatted_results[:limit]
 
 
 # ============================================
@@ -806,6 +658,201 @@ async def save_recipe(
     # 4. If not saved, create entry in user_saved_recipes
     # 5. Return success response
     raise HTTPException(status_code=501, detail="Not implemented yet")
+
+
+@router.get("/{recipe_id}", response_model=RecipeResponse)
+async def get_recipe(
+        recipe_id: str,
+        db: Session = Depends(get_db)
+):
+    """
+    Get detailed recipe information
+
+    **Returns:**
+    - Complete recipe details
+    - Full ingredient list with food names and quantities
+    - List of allergens present
+    - Nutritional information (total and per serving)
+    - Cooking instructions
+
+    **Errors:**
+    - 404: Recipe not found
+    """
+    # TODO: Implementation
+    # 1. Query recipe by UUID
+    # 2. Eager load ingredients (with food_items_master join for names)
+    # 3. Eager load allergens
+    # 4. Return 404 if not found
+    # 5. Return RecipeResponse
+    raise HTTPException(status_code=501, detail="Not implemented yet")
+
+
+@router.put("/{recipe_id}", response_model=RecipeResponse)
+async def update_recipe(
+        recipe_id: str,
+        updates: RecipeUpdate,
+        user_id: str = Query(..., description="User ID updating the recipe"),
+        db: Session = Depends(get_db)
+):
+    """
+    Update a custom recipe
+
+    **Authorization:**
+    - Only the user who created the recipe can update it
+    - Edamam-imported recipes (data_source='edamam') cannot be modified
+
+    **Partial Updates:**
+    - Only fields provided in request will be updated
+    - Ingredients list can be replaced entirely
+    - Allergens will be recalculated if ingredients change
+
+    **Errors:**
+    - 404: Recipe not found
+    - 403: User doesn't own recipe or recipe is from Edamam
+    """
+    # TODO: Implementation
+    # 1. Query existing recipe
+    # 2. Verify user owns recipe (check data_source='user_custom')
+    # 3. Update only provided fields
+    # 4. If ingredients updated, delete old and create new recipe_ingredients
+    # 5. Recalculate nutritional values if servings or ingredients changed
+    # 6. Update updated_at timestamp
+    # 7. Return updated RecipeResponse
+    raise HTTPException(status_code=501, detail="Not implemented yet")
+
+
+@router.delete("/{recipe_id}", status_code=204)
+async def delete_recipe(
+        recipe_id: str,
+        user_id: str = Query(..., description="User ID deleting the recipe"),
+        db: Session = Depends(get_db)
+):
+    """
+    Delete a custom recipe
+
+    **Authorization:**
+    - Only the user who created the recipe can delete it
+    - Edamam-imported recipes cannot be deleted (only unsaved)
+
+    **Cascade:**
+    - Automatically deletes associated recipe_ingredients
+    - Automatically deletes associated recipe_allergens
+    - Removes from user_saved_recipes for all users
+
+    **Errors:**
+    - 404: Recipe not found
+    - 403: User doesn't own recipe or recipe is from Edamam
+    """
+    # TODO: Implementation
+    # 1. Query existing recipe
+    # 2. Verify user owns recipe (data_source='user_custom')
+    # 3. Delete recipe (cascades to ingredients and allergens)
+    # 4. Return 204 No Content
+    raise HTTPException(status_code=501, detail="Not implemented yet")
+
+
+# ============================================
+# SMART RECOMMENDATIONS
+# ============================================
+
+
+
+
+# ============================================
+# EDAMAM INTEGRATION
+# ============================================
+
+@router.post("/import/edamam", response_model=RecipeResponse)
+async def import_from_edamam(
+        edamam_uri: str = Query(..., description="Edamam recipe URI (or ID)"),
+        user_id: str = Query(..., description="User ID importing the recipe"),
+        db: Session = Depends(get_db)
+):
+    """
+    Import a recipe from Edamam API into local database.
+    Maps ingredients to FoodItemMaster and saves the recipe.
+    """
+    # 1. Check if already imported
+    existing = db.query(RecipeMaster).filter(RecipeMaster.edamam_recipe_uri == edamam_uri).first()
+    if existing:
+        return format_recipe_response(existing, db)
+
+    # 2. Fetch details from API
+    data = await edamam_service.get_recipe_by_uri(edamam_uri)
+    if not data or "recipe" not in data:
+        raise HTTPException(status_code=404, detail="Recipe not found on Edamam")
+
+    recipe_data = data["recipe"]
+
+    # 3. Create Recipe Master Record
+    new_recipe = RecipeMaster(
+        edamam_recipe_uri=edamam_uri,
+        recipe_name=recipe_data["label"],
+        image_url=recipe_data["image"],
+        source_url=recipe_data["url"],
+        servings=int(recipe_data["yield"]),
+        total_time_minutes=int(recipe_data["totalTime"]),
+        total_calories=Decimal(recipe_data["calories"]),
+        cuisine_type=recipe_data["cuisineType"][0] if recipe_data.get("cuisineType") else "Global",
+        meal_type=recipe_data["mealType"][0] if recipe_data.get("mealType") else None,
+        data_source='edamam',
+
+        is_vegan="Vegan" in recipe_data["healthLabels"],
+        is_vegetarian="Vegetarian" in recipe_data["healthLabels"],
+        is_gluten_free="Gluten-Free" in recipe_data["healthLabels"],
+        is_dairy_free="Dairy-Free" in recipe_data["healthLabels"],
+        is_halal="Halal" in recipe_data["healthLabels"],
+        is_kosher="Kosher" in recipe_data["healthLabels"]
+    )
+
+    db.add(new_recipe)
+    db.flush()
+
+    # 4. Process Ingredients
+    for ing in recipe_data["ingredients"]:
+        food_id = ing.get("foodId")
+        food_item = None
+
+        if food_id:
+            food_item = db.query(FoodItemMaster).filter(FoodItemMaster.edamam_food_id == food_id).first()
+
+        if not food_item:
+            food_item = FoodItemMaster(
+                name=ing["food"],
+                category=ing.get("foodCategory"),
+                image_url=ing.get("image"),
+                edamam_food_id=food_id,
+                data_source="edamam"
+            )
+            db.add(food_item)
+            db.flush()
+
+        # --- FIX START: Sanitize Unit ---
+        raw_unit = ing.get("measure")
+        clean_unit = raw_unit
+
+        # Edamam returns "<unit>" or null for whole items (e.g. 1 apple)
+        if not raw_unit or raw_unit == "<unit>":
+            clean_unit = "count"
+            # --- FIX END ---
+
+        recipe_ing = RecipeIngredient(
+            recipe_id=new_recipe.recipe_id,
+            food_id=food_item.food_id,
+            quantity=ing["quantity"] if ing["quantity"] else 1,
+            unit=clean_unit,  # <--- Use the sanitized unit
+            ingredient_note=ing["text"],
+            is_optional=False
+        )
+        db.add(recipe_ing)
+
+    db.commit()
+    db.refresh(new_recipe)
+
+    return format_recipe_response(new_recipe, db)
+
+
+
 
 
 @router.delete("/{recipe_id}/save", status_code=204)

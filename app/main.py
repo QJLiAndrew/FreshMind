@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.database import engine, Base
 
+
 # Create database tables
 Base.metadata.create_all(bind=engine)
 
@@ -21,10 +22,12 @@ app.add_middleware(
 )
 
 # Include routers
-from app.routers import inventory, recipes
+from app.routers import inventory, recipes, grocery, users
 app.include_router(inventory.router)
 app.include_router(recipes.router)
 # app.include_router(grocery.router, prefix="/api/grocery", tags=["grocery"])
+app.include_router(grocery.router)
+app.include_router(users.router)
 
 
 @app.get("/")

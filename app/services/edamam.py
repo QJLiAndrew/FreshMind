@@ -5,70 +5,6 @@ from app.database import get_settings
 settings = get_settings()
 
 
-class EdamamFoodService:
-    """Service for Edamam Food Database API"""
-    BASE_URL = "https://api.edamam.com/api/food-database/v2"
-
-    def __init__(self):
-        self.app_id = settings.edamam_food_app_id
-        self.app_key = settings.edamam_food_app_key
-
-    async def search_food(self, query: str) -> Optional[Dict]:
-        """
-        Search for food items and get nutritional data
-
-        Args:
-            query: Food name or ingredient
-
-        Returns:
-            Food search results with nutritional information
-        """
-        async with httpx.AsyncClient() as client:
-            try:
-                response = await client.get(
-                    f"{self.BASE_URL}/parser",
-                    params={
-                        "app_id": self.app_id,
-                        "app_key": self.app_key,
-                        "ingr": query,
-                        "nutrition-type": "logging"
-                    },
-                    timeout=10.0
-                )
-                response.raise_for_status()
-                return response.json()
-            except httpx.HTTPError as e:
-                print(f"Error searching food: {e}")
-                return None
-
-    async def get_nutrients(self, ingredients: List[Dict]) -> Optional[Dict]:
-        """
-        Get detailed nutritional breakdown for ingredients
-
-        Args:
-            ingredients: List of ingredients with quantity and foodId
-
-        Returns:
-            Detailed nutritional information
-        """
-        async with httpx.AsyncClient() as client:
-            try:
-                response = await client.post(
-                    f"{self.BASE_URL}/nutrients",
-                    params={
-                        "app_id": self.app_id,
-                        "app_key": self.app_key
-                    },
-                    json={"ingredients": ingredients},
-                    timeout=10.0
-                )
-                response.raise_for_status()
-                return response.json()
-            except httpx.HTTPError as e:
-                print(f"Error getting nutrients: {e}")
-                return None
-
-
 class EdamamRecipeService:
     """Service for Edamam Recipe Search API"""
     BASE_URL = "https://api.edamam.com/api/recipes/v2"
@@ -86,20 +22,7 @@ class EdamamRecipeService:
             meal_type: Optional[str] = None,
             calories: Optional[str] = None,
     ) -> Optional[Dict]:
-        """
-        Search for recipes with filters
-
-        Args:
-            query: Ingredients or recipe name
-            diet: Diet label (e.g., balanced, high-protein, low-carb)
-            health: Health labels (e.g., vegan, vegetarian, gluten-free, kosher, halal)
-            cuisine_type: Cuisine type (e.g., Italian, Asian, Mexican)
-            meal_type: Meal type (e.g., breakfast, lunch, dinner, snack)
-            calories: Calorie range (e.g., "100-500")
-
-        Returns:
-            Recipe search results
-        """
+        """Search for recipes with filters"""
         params = {
             "app_id": self.app_id,
             "app_key": self.app_key,
@@ -107,16 +30,13 @@ class EdamamRecipeService:
             "type": "public"
         }
 
-        if diet:
-            params["diet"] = diet
+        if diet: params["diet"] = diet
         if health:
+            # Edamam expects multiple 'health' parameters, httpx handles lists automatically
             params["health"] = health
-        if cuisine_type:
-            params["cuisineType"] = cuisine_type
-        if meal_type:
-            params["mealType"] = meal_type
-        if calories:
-            params["calories"] = calories
+        if cuisine_type: params["cuisineType"] = cuisine_type
+        if meal_type: params["mealType"] = meal_type
+        if calories: params["calories"] = calories
 
         async with httpx.AsyncClient() as client:
             try:
@@ -129,4 +49,37 @@ class EdamamRecipeService:
                 return response.json()
             except httpx.HTTPError as e:
                 print(f"Error searching recipes: {e}")
+                return None
+
+    async def get_recipe_by_uri(self, recipe_uri: str) -> Optional[Dict]:
+        """
+        Fetch a specific recipe by its URI or ID.
+        Edamam IDs are often part of the URI, e.g., '.../recipe_id'
+        """
+        # Extract ID from URI if needed, or use the ID directly
+        # The URI usually looks like: http://www.edamam.com/ontologies/edamam.owl#recipe_b79327d05b8e5b838ad6cfd9576b30b6
+        # The API expects the hash part 'b79327d05b8e5b838ad6cfd9576b30b6'
+
+        recipe_id = recipe_uri
+        if "#recipe_" in recipe_uri:
+            recipe_id = recipe_uri.split("#recipe_")[1]
+
+        async with httpx.AsyncClient() as client:
+            try:
+                # We use the ID endpoint: /api/recipes/v2/{id}
+                url = f"{self.BASE_URL}/{recipe_id}"
+
+                response = await client.get(
+                    url,
+                    params={
+                        "app_id": self.app_id,
+                        "app_key": self.app_key,
+                        "type": "public"
+                    },
+                    timeout=10.0
+                )
+                response.raise_for_status()
+                return response.json()
+            except httpx.HTTPError as e:
+                print(f"Error fetching recipe details: {e}")
                 return None
