@@ -9,12 +9,11 @@ This module provides endpoints for:
 - User recipe management (save/favorite)
 """
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
 from typing import List, Optional
-from datetime import datetime, timedelta
+from datetime import timedelta
 
-from app.database import get_db
-from app.schemas import (
+from backend.app.database import get_db
+from backend.app.schemas import (
     RecipeCreate,
     RecipeUpdate,
     RecipeResponse,
@@ -22,7 +21,7 @@ from app.schemas import (
     SaveRecipeRequest
 )
 
-from app.services.edamam import EdamamRecipeService
+from backend.app.services.edamam import EdamamRecipeService
 
 router = APIRouter(prefix="/api/recipes", tags=["recipes"])
 edamam_service = EdamamRecipeService()
@@ -33,7 +32,7 @@ Helper functions for recipe router
 
 from decimal import Decimal
 from sqlalchemy.orm import Session, joinedload
-from app.models import RecipeIngredient, RecipeMaster, Allergen, RecipeAllergen, UserInventory, FoodItemMaster
+from backend.app.models import RecipeIngredient, RecipeMaster, Allergen, RecipeAllergen, UserInventory, FoodItemMaster
 
 
 def calculate_recipe_nutrition(ingredients: list, servings: int) -> dict:

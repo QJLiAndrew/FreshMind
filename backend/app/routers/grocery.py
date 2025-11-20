@@ -2,10 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional
 from uuid import UUID
-from decimal import Decimal
 
-from app.database import get_db
-from app.models import UserGroceryList, UserInventory, RecipeMaster, FoodItemMaster
+from backend.app.database import get_db
+from backend.app.models import UserGroceryList, UserInventory, RecipeMaster
 
 # Define a simple Pydantic schema for response here to keep it self-contained
 # (In a real app, you'd put this in schemas/__init__.py)

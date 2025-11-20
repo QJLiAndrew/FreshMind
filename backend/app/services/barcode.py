@@ -1,6 +1,5 @@
 import httpx
-from app.models import FoodItemMaster
-from decimal import Decimal
+from backend.app.models import FoodItemMaster
 
 
 async def scan_barcode(barcode: str) -> FoodItemMaster:

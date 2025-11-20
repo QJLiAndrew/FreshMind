@@ -4,16 +4,16 @@ Matches the PostgreSQL schema defined in create_database.sql
 """
 
 from sqlalchemy import (
-    Column, Numeric, String, Integer, Float, Boolean, Text, Date, DateTime,
-    ForeignKey, CheckConstraint, func, DECIMAL, text
+    Column, String, Integer, Boolean, Text, Date, DateTime,
+    ForeignKey, CheckConstraint, DECIMAL
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.hybrid import hybrid_property
-from datetime import datetime, date, timedelta
+from datetime import datetime, date
 import uuid
 
-from app.database import Base
+from backend.app.database import Base
 
 
 # ============================================

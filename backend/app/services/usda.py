@@ -1,6 +1,6 @@
 import httpx
 from typing import Optional, Dict
-from app.database import get_settings
+from backend.app.database import get_settings
 
 settings = get_settings()
 

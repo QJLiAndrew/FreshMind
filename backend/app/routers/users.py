@@ -1,11 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import Optional
 from uuid import UUID
 from pydantic import BaseModel
 
-from app.database import get_db
-from app.models import User
+from backend.app.database import get_db
+from backend.app.models import User
 
 router = APIRouter(prefix="/api/users", tags=["users"])
 

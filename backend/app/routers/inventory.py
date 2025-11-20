@@ -2,14 +2,14 @@
 Inventory management API endpoints
 """
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import date, timedelta
 from uuid import UUID
 
-from app.database import get_db
-from app.models import UserInventory, FoodItemMaster
-from app.schemas import (
+from backend.app.database import get_db
+from backend.app.models import UserInventory, FoodItemMaster
+from backend.app.schemas import (
     InventoryItemCreate,
     InventoryItemUpdate,
     InventoryItemResponse,
@@ -19,7 +19,7 @@ from app.schemas import (
     BarcodeResponse,
     FoodItemResponse
 )
-from app.services.openfoodfacts import OpenFoodFactsService
+from backend.app.services.openfoodfacts import OpenFoodFactsService
 
 router = APIRouter(prefix="/api/inventory", tags=["inventory"])
 off_service = OpenFoodFactsService()

@@ -4,5 +4,7 @@
 *.sql
 dummy_data.txt
 reset_db.py
-app/test_keys.py
-app/create_user.py
+backend/app/test_keys.py
+backend/app/create_user.py
+backend/app/test_keys.py
+backend/app/create_user.py
