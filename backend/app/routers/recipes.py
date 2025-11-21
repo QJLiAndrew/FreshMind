@@ -22,6 +22,7 @@ from backend.app.schemas import (
 )
 
 from backend.app.services.edamam import EdamamRecipeService
+from uuid import UUID
 
 router = APIRouter(prefix="/api/recipes", tags=["recipes"])
 edamam_service = EdamamRecipeService()
@@ -666,24 +667,22 @@ async def get_recipe(
 ):
     """
     Get detailed recipe information
-
-    **Returns:**
-    - Complete recipe details
-    - Full ingredient list with food names and quantities
-    - List of allergens present
-    - Nutritional information (total and per serving)
-    - Cooking instructions
-
-    **Errors:**
-    - 404: Recipe not found
     """
-    # TODO: Implementation
     # 1. Query recipe by UUID
-    # 2. Eager load ingredients (with food_items_master join for names)
-    # 3. Eager load allergens
-    # 4. Return 404 if not found
-    # 5. Return RecipeResponse
-    raise HTTPException(status_code=501, detail="Not implemented yet")
+    # We use options(joinedload(...)) to efficiently fetch related data in one query
+    recipe = db.query(RecipeMaster).filter(
+        RecipeMaster.recipe_id == UUID(recipe_id)
+    ).options(
+        joinedload(RecipeMaster.ingredients).joinedload(RecipeIngredient.food_item),
+        joinedload(RecipeMaster.allergens)
+    ).first()
+
+    # 2. Return 404 if not found
+    if not recipe:
+        raise HTTPException(status_code=404, detail="Recipe not found")
+
+    # 3. Return formatted response
+    return format_recipe_response(recipe, db)
 
 
 @router.put("/{recipe_id}", response_model=RecipeResponse)
