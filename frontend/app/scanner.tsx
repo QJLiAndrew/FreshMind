@@ -1,18 +1,19 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { StyleSheet, View, Alert, Vibration } from 'react-native';
 import { Text, Button, ActivityIndicator, IconButton } from 'react-native-paper';
 import { CameraView, useCameraPermissions } from 'expo-camera'; // Updated for Expo SDK 52
 import { useRouter } from 'expo-router';
 import api from '../api';
+import Config from '@/constants/Config';
+import { Href } from 'expo-router';
 
 export default function ScannerScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
   const [loading, setLoading] = useState(false);
+  const qrLock = useRef(false);
   const router = useRouter();
 
-  // REPLACE WITH YOUR REAL USER ID
-  const TEST_USER_ID = "REPLACE_WITH_YOUR_USER_UUID";
 
   if (!permission) {
     // Camera permissions are still loading
@@ -34,84 +35,76 @@ export default function ScannerScreen() {
   }
 
   const handleBarCodeScanned = async ({ type, data }: { type: string; data: string }) => {
-    if (scanned || loading) return;
+    if (data && !qrLock.current) {
+      qrLock.current = true;
+      setScanned(true);
+      Vibration.vibrate();
+      setLoading(true);
 
-    setScanned(true);
-    Vibration.vibrate();
-    setLoading(true);
+      try {
+        console.log(`Scanned barcode: ${data}`);
+        const scanResponse = await api.post('/inventory/scan', { barcode: data });
 
-    try {
-      console.log(`Scanned barcode: ${data}`);
+        if (!scanResponse.data.found) {
+          Alert.alert("Not Found", "Item not in database.", [
+            {
+              text: "OK",
+              onPress: () => {
+                setScanned(false);
+                setLoading(false);
+                qrLock.current = false;
+              }
+            }
+          ]);
+          return;
+        }
 
-      // 1. Check/Create Food Item in Backend
-      const scanResponse = await api.post('/inventory/scan', { barcode: data });
+        const foodItem = scanResponse.data.food_item;
+        const foodName = foodItem.name || "Unknown Item";
+        const foodId = foodItem.food_id;
 
-      if (!scanResponse.data.found) {
-        Alert.alert("Not Found", "This item is not in our database yet.");
+        Alert.alert(
+          "Item Found!",
+          `Do you want to add '${foodName}'?`,
+          [
+            {
+              text: "Cancel",
+              style: "cancel",
+              onPress: () => {
+                setScanned(false);
+                setLoading(false);
+                qrLock.current = false;
+              }
+            },
+            {
+              text: "Configure & Add",
+              onPress: () => proceedToAddItem(foodId, foodName)
+            }
+          ]
+        );
+
+      } catch (error) {
+        console.error(error);
+        Alert.alert("Error", "Failed to fetch product data.");
         setScanned(false);
         setLoading(false);
-        return;
+        qrLock.current = false;
       }
-
-      const foodItem = scanResponse.data.food_item;
-      const foodName = foodItem.name || "Unknown Item";
-      const foodId = foodItem.food_id;
-
-      // 2. Ask User to Confirm Adding
-      Alert.alert(
-        "Item Found!",
-        `Do you want to add '${foodName}' to your fridge?`,
-        [
-          {
-            text: "Cancel",
-            style: "cancel",
-            onPress: () => {
-              setScanned(false);
-              setLoading(false);
-            }
-          },
-          {
-            text: "Add to Fridge",
-            onPress: async () => {
-              await addToFridge(foodId, foodName);
-            }
-          }
-        ]
-      );
-
-    } catch (error) {
-      console.error(error);
-      Alert.alert("Error", "Failed to fetch product data. Check your server connection.");
-      setScanned(false);
-      setLoading(false);
     }
   };
 
-  const addToFridge = async (foodId: string, foodName: string) => {
-    try {
-      // 3. Add to User Inventory
-      await api.post('/inventory/items',
-        {
-          food_id: foodId,
-          quantity: 1,
-          unit: 'unit',
-          expiry_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // Default 7 days from now
-          storage_location: 'fridge'
-        },
-        {
-          params: { user_id: TEST_USER_ID }
-        }
-      );
+  const proceedToAddItem = (foodId: string, foodName: string) => {
+    qrLock.current = false;
+    setScanned(false);
+    setLoading(false);
 
-      Alert.alert("Success", `${foodName} added to your fridge!`);
-      router.back(); // Go back to Home Screen
-    } catch (error) {
-      console.error(error);
-      Alert.alert("Error", "Could not save item to inventory.");
-      setScanned(false);
-      setLoading(false);
-    }
+    router.push({
+      pathname: '/inventory/add_item',
+      params: { foodId, foodName }
+    } as any);
   };
+
+
 
   return (
     <View style={styles.container}>

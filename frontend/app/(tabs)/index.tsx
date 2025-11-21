@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { StyleSheet, View, FlatList, RefreshControl, Image } from 'react-native';
+import { StyleSheet, View, FlatList, RefreshControl, Image, Alert } from 'react-native';
 import { Text, Card, Chip, FAB, ActivityIndicator, Appbar, useTheme } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import api from '../../api'; // Import API helper
+import Config from '@/constants/Config';
+
 
 // Define what an Inventory Item looks like
 interface InventoryItem {
@@ -25,14 +27,12 @@ export default function SmartFridgeScreen() {
   const router = useRouter();
   const theme = useTheme();
 
-  // REPLACE WITH YOUR REAL TEST USER ID
-  const TEST_USER_ID = "REPLACE_WITH_YOUR_USER_UUID";
+
 
   const fetchInventory = async () => {
     try {
-      // Call GET /api/inventory/items
       const response = await api.get('/inventory/items', {
-        params: { user_id: TEST_USER_ID }
+        params: { user_id: Config.TEST_USER_ID } // Use Config
       });
       setItems(response.data.items);
     } catch (error) {
@@ -127,12 +127,19 @@ export default function SmartFridgeScreen() {
       )}
 
       {/* Floating Action Button to Scan */}
-      <FAB
-        icon="barcode-scan"
-        label="Scan Item"
-        style={styles.fab}
-        onPress={() => router.push('/scanner')}
-      />
+    <FAB
+      icon="plus"
+      label="Add Item"
+      style={styles.fab}
+      onPress={() => {
+        Alert.alert("Add Item", "Choose method", [
+          { text: "Scan Barcode", onPress: () => router.push('/scanner') },
+          // FIX: Add 'as any' to bypass strict route checking temporarily
+          { text: "Manual Search", onPress: () => router.push('/inventory/add_item' as any) },
+          { text: "Cancel", style: "cancel" }
+        ])
+      }}
+    />
     </SafeAreaView>
   );
 }

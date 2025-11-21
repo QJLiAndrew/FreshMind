@@ -9,3 +9,6 @@ backend/app/create_user.py
 backend/app/test_keys.py
 backend/app/create_user.py
 frontend/api.js
+frontend/app/(tabs)/index.tsx
+frontend/api.tsx
+frontend/constants/Config.ts

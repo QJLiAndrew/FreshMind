@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import date, timedelta
 from uuid import UUID
+from backend.app.services.usda import USDAService
 
 from backend.app.database import get_db
 from backend.app.models import UserInventory, FoodItemMaster
@@ -23,6 +24,7 @@ from backend.app.services.openfoodfacts import OpenFoodFactsService
 
 router = APIRouter(prefix="/api/inventory", tags=["inventory"])
 off_service = OpenFoodFactsService()
+usda_service = USDAService()
 
 # ==========================================
 # 1. BARCODE SCANNING ( The Entry Point )
@@ -368,3 +370,44 @@ async def get_inventory_stats(
         stats["storage_breakdown"][loc] = stats["storage_breakdown"].get(loc, 0) + 1
 
     return stats
+
+
+@router.get("/search", response_model=List[FoodItemResponse])
+async def search_food_items(
+        query: str,
+        db: Session = Depends(get_db)
+):
+    """
+    Search for food items by name.
+    1. Search Local DB
+    2. If few results, search USDA/OpenFoodFacts and save to local DB
+    """
+    # 1. Local Search
+    local_results = db.query(FoodItemMaster).filter(
+        FoodItemMaster.name.ilike(f"%{query}%")
+    ).limit(5).all()
+
+    results = [FoodItemResponse.from_orm(item) for item in local_results]
+
+    # 2. External Search (if we have few local results)
+    if len(results) < 5:
+        usda_data = await usda_service.search_foods(query)
+        if usda_data and 'foods' in usda_data:
+            for food in usda_data['foods']:
+                # Avoid duplicates by checking fdcId or name
+                existing = db.query(FoodItemMaster).filter(FoodItemMaster.usda_fdc_id == food['fdcId']).first()
+                if not existing:
+                    # Parse USDA data to FoodItemMaster (Simplified for brevity)
+                    new_food = FoodItemMaster(
+                        name=food['description'],
+                        category=food.get('foodCategory'),
+                        usda_fdc_id=food['fdcId'],
+                        data_source="usda"
+                        # ... map nutrients if available ...
+                    )
+                    db.add(new_food)
+                    db.commit()
+                    db.refresh(new_food)
+                    results.append(FoodItemResponse.from_orm(new_food))
+
+    return results
