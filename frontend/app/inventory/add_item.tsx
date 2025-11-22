@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, ScrollView, Alert } from 'react-native';
 import { TextInput, Button, Text, SegmentedButtons, ActivityIndicator } from 'react-native-paper';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -24,6 +24,25 @@ export default function AddItemScreen() {
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
 
+  useEffect(() => {
+    if (params.inventoryId) {
+      const fetchItem = async () => {
+        try {
+          // You might need to add this GET endpoint to backend if not exists,
+          // or pass data via params. For now, let's assume we pass data via params or fetch it.
+          // Simpler approach for MVP: Pass data via params from the Home Screen
+          if (params.initialQuantity) setQuantity(params.initialQuantity as string);
+          if (params.initialUnit) setUnit(params.initialUnit as string);
+          if (params.initialLocation) setStorageLocation(params.initialLocation as string);
+          if (params.initialExpiry) setExpiryDate(new Date(params.initialExpiry as string));
+        } catch (e) {
+          console.error(e);
+        }
+      };
+      fetchItem();
+    }
+  }, [params.inventoryId]);
+
   // Search functionality for Manual Entry
   const searchFood = async (query: string) => {
     if (query.length < 3) return;
@@ -46,23 +65,33 @@ export default function AddItemScreen() {
 
     setLoading(true);
     try {
-      await api.post('/inventory/items', {
-        food_id: foodId,
-        quantity: parseFloat(quantity),
-        unit: unit,
-        expiry_date: expiryDate.toISOString().split('T')[0],
-        storage_location: storageLocation,
-        notes: "Added via FreshMind App"
-      }, {
-        params: { user_id: Config.TEST_USER_ID }
-      });
-
-      Alert.alert("Success", "Item added to inventory!");
-
-      // Navigate back to Home and refresh
-      if (router.canDismiss()) {
-        router.dismissAll();
+      if (params.inventoryId) {
+        // EDIT MODE: PUT request
+        await api.put(`/inventory/items/${params.inventoryId}`, {
+          quantity: parseFloat(quantity),
+          unit: unit,
+          expiry_date: expiryDate.toISOString().split('T')[0],
+          storage_location: storageLocation,
+        }, {
+          params: { user_id: Config.TEST_USER_ID }
+        });
+        Alert.alert("Updated", "Item updated successfully!");
+      } else {
+        // CREATE MODE: POST request
+        await api.post('/inventory/items', {
+          food_id: foodId,
+          quantity: parseFloat(quantity),
+          unit: unit,
+          expiry_date: expiryDate.toISOString().split('T')[0],
+          storage_location: storageLocation,
+          notes: "Added via FreshMind App"
+        }, {
+          params: { user_id: Config.TEST_USER_ID }
+        });
+        Alert.alert("Success", "Item added to inventory!");
       }
+
+      if (router.canDismiss()) router.dismissAll();
       router.replace('/(tabs)');
 
     } catch (error) {

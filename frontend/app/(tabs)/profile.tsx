@@ -1,9 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { ScrollView, View, StyleSheet, Alert } from 'react-native';
-import { Appbar, List, Switch, Button, Text, Divider, ActivityIndicator, Avatar, useTheme } from 'react-native-paper';
+import {
+    Appbar,
+    List,
+    Switch,
+    Button,
+    Text,
+    Divider,
+    ActivityIndicator,
+    Avatar,
+    useTheme,
+    SegmentedButtons
+} from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import api from '../../api';
 import Config from '@/constants/Config';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function ProfileScreen() {
   const [profile, setProfile] = useState<any>(null);
@@ -27,10 +39,14 @@ export default function ProfileScreen() {
     }
   };
 
-  const togglePreference = async (key: string, value: boolean) => {
+  const togglePreference = async (key: string, value: string | boolean) => {
     // Optimistic UI update
     const updatedProfile = { ...profile, [key]: value };
     setProfile(updatedProfile);
+
+    if (key === 'unit_preference' && typeof value === 'string') {
+      await AsyncStorage.setItem('UNIT_PREFERENCE', value);
+    }
 
     setSaving(true);
     try {
@@ -131,6 +147,33 @@ export default function ProfileScreen() {
 
         <Divider />
 
+        <Divider />
+
+        <List.Section>
+          <List.Subheader>App Settings</List.Subheader>
+
+          {/* Changed to Vertical Layout */}
+          <View>
+            <List.Item
+              title="Unit Preference"
+              description="Weight and volume units"
+              left={() => <List.Icon icon="scale-balance" />}
+            />
+            <View style={{ paddingHorizontal: 16, paddingBottom: 8 }}>
+              <SegmentedButtons
+                value={profile?.unit_preference || 'metric'}
+                onValueChange={(val) => togglePreference('unit_preference', val)}
+                buttons={[
+                  { value: 'metric', label: 'Metric (g/ml)', showSelectedCheck: true },
+                  { value: 'imperial', label: 'Imperial (oz/lb)', showSelectedCheck: true },
+                ]}
+              />
+            </View>
+          </View>
+        </List.Section>
+
+        <Divider />
+
         <View style={{ padding: 20 }}>
           <Button mode="outlined" onPress={() => Alert.alert("Log Out", "This is a demo app.")}>
             Log Out
@@ -147,4 +190,9 @@ const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   header: { alignItems: 'center', padding: 20 },
   hint: { paddingHorizontal: 16, paddingBottom: 10, color: 'gray', fontSize: 12 },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
 });

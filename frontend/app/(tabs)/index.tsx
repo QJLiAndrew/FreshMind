@@ -5,6 +5,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import api from '../../api'; // Import API helper
 import Config from '@/constants/Config';
+import { scheduleExpiryNotifications } from '@/utils/notifications';
+import * as Notifications from 'expo-notifications';
 
 
 
@@ -28,7 +30,20 @@ export default function SmartFridgeScreen() {
   const router = useRouter();
   const theme = useTheme();
 
+  useEffect(() => {
+    const askPermission = async () => {
+      const { status } = await Notifications.getPermissionsAsync();
+      if (status !== 'granted') {
+        const { status: newStatus } = await Notifications.requestPermissionsAsync();
+        if (newStatus !== 'granted') {
+          // Optional: Handle refusal (e.g., show an alert)
+          console.log("Notification permission denied");
+        }
+      }
+    };
 
+    askPermission();
+  }, []);
 
   const fetchInventory = async () => {
     try {
@@ -36,6 +51,8 @@ export default function SmartFridgeScreen() {
         params: { user_id: Config.TEST_USER_ID } // Use Config
       });
       setItems(response.data.items);
+      await Notifications.dismissAllNotificationsAsync();
+      await scheduleExpiryNotifications(response.data.items);
     } catch (error) {
       console.error("Failed to fetch inventory:", error);
       // Ideally show a Snackbar error here
@@ -63,7 +80,22 @@ export default function SmartFridgeScreen() {
   };
 
   const renderItem = ({ item }: { item: InventoryItem }) => (
-    <Card style={styles.card}>
+    <Card
+      style={styles.card}
+      onLongPress={() => deleteItem(item.inventory_id, item.food_name)}
+      onPress={() => router.push({
+        pathname: '/inventory/add_item',
+        params: {
+          inventoryId: item.inventory_id,
+          foodId: 'EXISTING', // Dummy value to bypass "Select Food" step
+          foodName: item.food_name,
+          initialQuantity: item.quantity.toString(),
+          initialUnit: item.unit,
+          initialLocation: item.storage_location,
+          initialExpiry: item.expiry_date
+        }
+      } as any)}
+    >
       <Card.Content style={styles.cardContent}>
         {/* Left: Image */}
         {item.food_image_url ? (
@@ -98,6 +130,32 @@ export default function SmartFridgeScreen() {
       </Card.Content>
     </Card>
   );
+
+  const deleteItem = (inventoryId: string, foodName: string) => {
+    Alert.alert(
+      "Remove Item",
+      `Are you sure you want to remove '${foodName}' from your fridge?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await api.delete(`/inventory/items/${inventoryId}`, {
+                params: { user_id: Config.TEST_USER_ID }
+              });
+              // Refresh list locally or fetch again
+              setItems(prev => prev?.filter(item => item.inventory_id !== inventoryId));
+            } catch (error) {
+              console.error(error);
+              Alert.alert("Error", "Failed to delete item.");
+            }
+          }
+        }
+      ]
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
