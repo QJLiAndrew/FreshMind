@@ -9,7 +9,7 @@ from backend.app.models import UserGroceryList, UserInventory, RecipeMaster
 # Define a simple Pydantic schema for response here to keep it self-contained
 # (In a real app, you'd put this in schemas/__init__.py)
 from pydantic import BaseModel
-from datetime import datetime
+from datetime import datetime, date, timedelta
 
 
 class GroceryItemResponse(BaseModel):
@@ -123,6 +123,50 @@ async def clear_purchased_items(
         UserGroceryList.is_purchased == True
     ).delete()
     db.commit()
+
+
+@router.post("/checkout", status_code=200)
+async def checkout_grocery_list(
+        user_id: str = Query(...),
+        db: Session = Depends(get_db)
+):
+    """
+    Move purchased items from Grocery List -> User Inventory
+    Then clear them from the list.
+    """
+    # 1. Find purchased items
+    purchased_items = db.query(UserGroceryList).filter(
+        UserGroceryList.user_id == UUID(user_id),
+        UserGroceryList.is_purchased == True
+    ).all()
+
+    if not purchased_items:
+        raise HTTPException(status_code=400, detail="No purchased items to checkout")
+
+    moved_count = 0
+
+    # 2. Move to Inventory
+    for item in purchased_items:
+        # Create inventory entry
+        new_inventory = UserInventory(
+            user_id=item.user_id,
+            food_id=item.food_id,
+            quantity=item.quantity_needed,
+            unit=item.unit,
+            # Default expiry: 1 week from now (MVP logic)
+            expiry_date=date.today() + timedelta(days=7),
+            storage_location="fridge",
+            notes=f"Bought from grocery list on {date.today()}"
+        )
+        db.add(new_inventory)
+
+        # Delete from grocery list
+        db.delete(item)
+        moved_count += 1
+
+    db.commit()
+
+    return {"message": f"Successfully moved {moved_count} items to your fridge!"}
 
 
 # ==========================================

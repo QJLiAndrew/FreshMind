@@ -1,112 +1,100 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import React, { useState, useCallback } from 'react';
+import { View, FlatList, StyleSheet, RefreshControl } from 'react-native';
+import { Appbar, Card, Text, Chip, Button, ProgressBar, useTheme } from 'react-native-paper';
+import { useRouter, useFocusEffect } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import api from '../../api';
+import Config from '../../constants/Config';
 
-import { Collapsible } from '@/components/ui/collapsible';
-import { ExternalLink } from '@/components/external-link';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Fonts } from '@/constants/theme';
+export default function RecipesScreen() {
+  const [recommendations, setRecommendations] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const router = useRouter();
+  const theme = useTheme();
 
-export default function TabTwoScreen() {
+  const fetchRecommendations = async () => {
+    try {
+      // Use the recommendation endpoint
+      const res = await api.get('/recipes/recommend', {
+        params: { user_id: Config.TEST_USER_ID, limit: 10 }
+      });
+      setRecommendations(res.data);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchRecommendations();
+    }, [])
+  );
+
+  const renderItem = ({ item }: { item: any }) => {
+    const { recipe, match_score, missing_ingredients } = item;
+
+    return (
+      <Card style={styles.card} onPress={() => router.push(`/recipes/${recipe.recipe_id}` as any)}>
+        <Card.Cover source={{ uri: recipe.image_url || 'https://via.placeholder.com/300' }} />
+        <Card.Content style={styles.content}>
+          <Text variant="titleMedium" style={styles.title}>{recipe.recipe_name}</Text>
+
+          {/* Match Score Indicator */}
+          <View style={styles.matchContainer}>
+            <Text variant="labelMedium" style={{ color: theme.colors.primary, fontWeight: 'bold' }}>
+              {Math.round(match_score)}% Match
+            </Text>
+            <ProgressBar progress={match_score / 100} color={theme.colors.primary} style={styles.progress} />
+          </View>
+
+          <Text variant="bodySmall" style={styles.missing}>
+            Missing: {missing_ingredients.slice(0, 3).join(', ')}
+            {missing_ingredients.length > 3 ? ` +${missing_ingredients.length - 3} more` : ''}
+          </Text>
+        </Card.Content>
+      </Card>
+    );
+  };
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#D0D0D0', dark: '#353636' }}
-      headerImage={
-        <IconSymbol
-          size={310}
-          color="#808080"
-          name="chevron.left.forwardslash.chevron.right"
-          style={styles.headerImage}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText
-          type="title"
-          style={{
-            fontFamily: Fonts.rounded,
-          }}>
-          Explore
-        </ThemedText>
-      </ThemedView>
-      <ThemedText>This app includes example code to help you get started.</ThemedText>
-      <Collapsible title="File-based routing">
-        <ThemedText>
-          This app has two screens:{' '}
-          <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> and{' '}
-          <ThemedText type="defaultSemiBold">app/(tabs)/explore.tsx</ThemedText>
-        </ThemedText>
-        <ThemedText>
-          The layout file in <ThemedText type="defaultSemiBold">app/(tabs)/_layout.tsx</ThemedText>{' '}
-          sets up the tab navigator.
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/router/introduction">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Android, iOS, and web support">
-        <ThemedText>
-          You can open this project on Android, iOS, and the web. To open the web version, press{' '}
-          <ThemedText type="defaultSemiBold">w</ThemedText> in the terminal running this project.
-        </ThemedText>
-      </Collapsible>
-      <Collapsible title="Images">
-        <ThemedText>
-          For static images, you can use the <ThemedText type="defaultSemiBold">@2x</ThemedText> and{' '}
-          <ThemedText type="defaultSemiBold">@3x</ThemedText> suffixes to provide files for
-          different screen densities
-        </ThemedText>
-        <Image
-          source={require('@/assets/images/react-logo.png')}
-          style={{ width: 100, height: 100, alignSelf: 'center' }}
-        />
-        <ExternalLink href="https://reactnative.dev/docs/images">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Light and dark mode components">
-        <ThemedText>
-          This template has light and dark mode support. The{' '}
-          <ThemedText type="defaultSemiBold">useColorScheme()</ThemedText> hook lets you inspect
-          what the user&apos;s current color scheme is, and so you can adjust UI colors accordingly.
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/develop/user-interface/color-themes/">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Animations">
-        <ThemedText>
-          This template includes an example of an animated component. The{' '}
-          <ThemedText type="defaultSemiBold">components/HelloWave.tsx</ThemedText> component uses
-          the powerful{' '}
-          <ThemedText type="defaultSemiBold" style={{ fontFamily: Fonts.mono }}>
-            react-native-reanimated
-          </ThemedText>{' '}
-          library to create a waving hand animation.
-        </ThemedText>
-        {Platform.select({
-          ios: (
-            <ThemedText>
-              The <ThemedText type="defaultSemiBold">components/ParallaxScrollView.tsx</ThemedText>{' '}
-              component provides a parallax effect for the header image.
-            </ThemedText>
-          ),
-        })}
-      </Collapsible>
-    </ParallaxScrollView>
+    <SafeAreaView style={styles.container}>
+      <Appbar.Header mode="center-aligned" elevated>
+        <Appbar.Content title="What to Cook?" />
+      </Appbar.Header>
+
+      <FlatList
+        data={recommendations}
+        keyExtractor={(item) => item.recipe.recipe_id}
+        renderItem={renderItem}
+        contentContainerStyle={styles.list}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchRecommendations(); }} />
+        }
+        ListEmptyComponent={
+          !loading ? (
+            <View style={styles.center}>
+              <Text>No recommendations yet.</Text>
+              <Text variant="bodySmall">Add more items to your fridge!</Text>
+            </View>
+          ) : null
+        }
+      />
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  headerImage: {
-    color: '#808080',
-    bottom: -90,
-    left: -35,
-    position: 'absolute',
-  },
-  titleContainer: {
-    flexDirection: 'row',
-    gap: 8,
-  },
+  container: { flex: 1, backgroundColor: '#f5f5f5' },
+  list: { padding: 16 },
+  card: { marginBottom: 16, backgroundColor: 'white' },
+  content: { marginTop: 10 },
+  title: { fontWeight: 'bold', marginBottom: 5 },
+  matchContainer: { marginVertical: 8 },
+  progress: { height: 6, borderRadius: 3, marginTop: 4 },
+  missing: { color: '#666' },
+  center: { alignItems: 'center', marginTop: 50 }
 });

@@ -81,11 +81,12 @@ export default function SmartFridgeScreen() {
           </Text>
         </View>
 
-        {/* Right: Status Chip */}
         <View style={{ alignItems: 'flex-end' }}>
            <Chip
+             compact // <--- Added compact mode
              textStyle={{ color: 'white', fontSize: 10 }}
-             style={{ backgroundColor: getStatusColor(item.freshness_status), height: 24 }}
+             // Removed 'height: 24' so it auto-sizes
+             style={{ backgroundColor: getStatusColor(item.freshness_status) }}
            >
              {item.days_until_expiry} days
            </Chip>
