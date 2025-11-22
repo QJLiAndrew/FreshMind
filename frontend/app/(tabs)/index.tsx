@@ -167,7 +167,7 @@ export default function SmartFridgeScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <Appbar.Header mode="center-aligned" elevated>
+      <Appbar.Header mode="small" elevated>
         <Appbar.Content title="My Smart Fridge" />
         <Appbar.Action icon="refresh" onPress={fetchInventory} />
       </Appbar.Header>

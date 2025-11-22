@@ -65,7 +65,7 @@ export default function ProfileScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <Appbar.Header mode="center-aligned" elevated>
+      <Appbar.Header mode="small" elevated>
         <Appbar.Content title="My Profile" />
       </Appbar.Header>
 

@@ -80,13 +80,12 @@ const clearPurchased = async () => {
     );
   };
 
-  const renderItem = ({ item }: { item: any }) => (
+const renderItem = ({ item }: { item: any }) => (
     <Card
       style={[styles.card, item.is_purchased && styles.purchasedCard]}
-      onPress={() => togglePurchased(item.grocery_item_id, item.is_purchased)} // Make whole card tappable
+      onPress={() => togglePurchased(item.grocery_item_id, item.is_purchased)}
     >
       <Card.Content style={styles.cardRow}>
-        {/* REPLACED Checkbox with IconButton for better visibility */}
         <IconButton
           icon={item.is_purchased ? "checkbox-marked" : "checkbox-blank-outline"}
           iconColor={item.is_purchased ? theme.colors.primary : '#666'}
@@ -101,9 +100,16 @@ const clearPurchased = async () => {
           >
             {item.food_name}
           </Text>
+
+          {/* UPDATED DETAIL TEXT LOGIC */}
           <Text variant="bodySmall" style={styles.details}>
-            {item.quantity_needed} {item.unit} • {item.reason === 'recipe_requirement' ? 'For Recipe' : 'Manual'}
+            {item.quantity_needed} {item.unit} • {
+              item.reason === 'recipe_requirement'
+                ? (item.associated_recipe_name ? `For: ${item.associated_recipe_name}` : 'For Recipe')
+                : 'Manual Add'
+            }
           </Text>
+
         </View>
       </Card.Content>
     </Card>
@@ -113,7 +119,7 @@ const clearPurchased = async () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <Appbar.Header mode="center-aligned" elevated>
+      <Appbar.Header mode="small" elevated>
         <Appbar.Content title="Grocery List" />
         {purchasedCount > 0 && (
           <Appbar.Action icon="check-all" onPress={clearPurchased} />
@@ -142,7 +148,10 @@ const clearPurchased = async () => {
       <FAB
         icon="plus"
         style={styles.fab}
-        onPress={() => Alert.alert("Coming Soon", "Use the Recipe feature to generate items automatically!")}
+        onPress={() => router.push({
+          pathname: '/inventory/add_item',
+          params: { mode: 'grocery' }
+        } as any)}
       />
     </SafeAreaView>
   );

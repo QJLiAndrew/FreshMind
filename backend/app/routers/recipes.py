@@ -461,8 +461,6 @@ async def recommend_recipes_from_inventory(
     - Filters by Request Parameters (Manual Override)
     - Scores based on Inventory Availability
     """
-    print(f"\n🔍 --- RECIPE RECOMMENDATION DEBUG ---")
-    print(f"📥 Inputs: vegan={is_vegan}, gf={is_gluten_free}, halal={is_halal}")
     # 1. FETCH USER PROFILE (Personalization)
     try:
         user_uuid = UUID(user_id)
@@ -472,8 +470,6 @@ async def recommend_recipes_from_inventory(
     user = db.query(User).filter(User.user_id == user_uuid).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-
-    print(f"👤 User Profile: vegan={user.is_vegan}, gf={user.is_gluten_free}")
 
     # 2. GET USER INVENTORY (Non-expired items)
     from datetime import date
@@ -485,10 +481,8 @@ async def recommend_recipes_from_inventory(
         joinedload(UserInventory.food_item)
     ).all()
 
-    print(f"DEBUG: Found {len(user_inventory)} inventory items for user.")
 
     if not user_inventory:
-        print("DEBUG: Inventory is empty! Returning 0 recommendations.")
         return []
 
     # Create lookup sets
@@ -507,27 +501,20 @@ async def recommend_recipes_from_inventory(
     )
 
     total_recipes = query.count()
-    print(f"📚 Total Recipes in DB: {total_recipes}")
 
     # --- APPLY AUTOMATIC USER PREFERENCES ---
     # These act as "hard filters" - if you are Vegan, you ONLY see Vegan.
     if user.is_vegan:
-        print("user is vegan")
         query = query.filter(RecipeMaster.is_vegan == True)
     if user.is_vegetarian:
-        print("user is vegetarian")
         query = query.filter(RecipeMaster.is_vegetarian == True)
     if user.is_gluten_free:
-        print("user is gluten_free")
         query = query.filter(RecipeMaster.is_gluten_free == True)
     if user.is_dairy_free:
-        print("user is dairy_free")
         query = query.filter(RecipeMaster.is_dairy_free == True)
     if user.is_halal:
-        print("user is halal")
         query = query.filter(RecipeMaster.is_halal == True)
     if user.is_kosher:
-        print("user is kosher")
         query = query.filter(RecipeMaster.is_kosher == True)
 
     # --- APPLY MANUAL FILTERS ---
@@ -537,20 +524,15 @@ async def recommend_recipes_from_inventory(
 
     # If manual toggles are passed (overriding or adding to profile), apply them
     if is_vegan is not None:
-        print(f"   -> Applying Manual Filter: is_vegan={is_vegan}")
         query = query.filter(RecipeMaster.is_vegan == is_vegan)
     if is_vegetarian is not None:
-        print(f"   -> Applying Manual Filter: is_vegetarian={is_vegetarian}")
         query = query.filter(RecipeMaster.is_vegetarian == is_vegetarian)
     if is_halal is not None:
-        print(f"   -> Applying Manual Filter: is_halal={is_halal}")
         query = query.filter(RecipeMaster.is_halal == is_halal)
     if is_gluten_free is not None:
-        print(f"   -> Applying Manual Filter: is_gluten_free={is_gluten_free}")
         query = query.filter(RecipeMaster.is_gluten_free == is_gluten_free)
 
     recipes = query.all()
-    print(f"✅ Recipes remaining after filters: {len(recipes)}")
 
     # 4. SCORING ALGORITHM
     recommendations = []
@@ -558,7 +540,6 @@ async def recommend_recipes_from_inventory(
 
     for recipe in recipes:
         if not recipe.ingredients:
-            print(f"DEBUG: No ingredients for recipe {recipe.ingredients}")
             continue
 
         total_ingredients = len(recipe.ingredients)
@@ -585,13 +566,11 @@ async def recommend_recipes_from_inventory(
             else:
                 missing_ingredients.append(ing.food_item.name)
 
-        print(f"DEBUG: Scoring Recipe '{recipe.recipe_name}'...")
         match_count = 0
         for ing in recipe.ingredients:
             ing_id = str(ing.food_id)
             has_item = ing_id in available_food_ids
             if has_item: match_count += 1
-            print(f"   - Ing: {ing.food_item.name} (ID: {ing_id}) -> Have? {has_item}")
 
         # Calculate Base Score (0-100)
         base_match_score = (available_count / total_ingredients) * 100
@@ -601,10 +580,8 @@ async def recommend_recipes_from_inventory(
 
         final_score = base_match_score + expiring_bonus
 
-        print(f"   -> Final Score: {final_score}% (Min required: {min_match_score}%)")
 
         if final_score < min_match_score:
-            print("   -> SKIPPED (Score too low)")
             continue
 
         # Filter by minimum score

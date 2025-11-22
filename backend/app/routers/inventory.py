@@ -26,6 +26,62 @@ router = APIRouter(prefix="/api/inventory", tags=["inventory"])
 off_service = OpenFoodFactsService()
 usda_service = USDAService()
 
+
+def guess_food_image(name: str, category: Optional[str] = None) -> Optional[str]:
+    """
+    Assign a generic image based on the food name.
+    Uses TheMealDB's free ingredient images.
+    """
+    name_lower = name.lower()
+
+    # Map common keywords to image filenames
+    # TheMealDB format: https://www.themealdb.com/images/ingredients/{Name}.png
+    common_items = {
+        "chicken": "Chicken",
+        "rice": "Rice",
+        "beef": "Beef",
+        "pork": "Pork",
+        "egg": "Eggs",
+        "milk": "Milk",
+        "cheese": "Cheese",
+        "butter": "Butter",
+        "apple": "Apple",
+        "banana": "Banana",
+        "orange": "Orange",
+        "tomato": "Tomato",
+        "potato": "Potatoes",
+        "onion": "Onion",
+        "carrot": "Carrots",
+        "broccoli": "Broccoli",
+        "bread": "Bread",
+        "pasta": "Farfalle",  # Generic pasta
+        "spaghetti": "Spaghetti",
+        "fish": "Fish",
+        "salmon": "Salmon",
+        "tuna": "Tuna",
+        "yogurt": "Greek Yogurt",
+        "chocolate": "Chocolate",
+        "flour": "Flour",
+        "sugar": "Sugar",
+        "salt": "Salt",
+        "water": "Water",
+        "oil": "Olive Oil",
+        "avocado": "Avocado",
+        "lettuce": "Lettuce",
+        "cucumber": "Cucumber",
+        "garlic": "Garlic",
+        "lemon": "Lemon",
+        "lime": "Lime",
+        "strawberry": "Strawberries",
+        "grape": "Grapes"
+    }
+
+    for key, filename in common_items.items():
+        if key in name_lower:
+            return f"https://www.themealdb.com/images/ingredients/{filename}.png"
+
+    return None
+
 # ==========================================
 # 1. BARCODE SCANNING ( The Entry Point )
 # ==========================================
@@ -397,13 +453,14 @@ async def search_food_items(
                 # Avoid duplicates by checking fdcId or name
                 existing = db.query(FoodItemMaster).filter(FoodItemMaster.usda_fdc_id == food['fdcId']).first()
                 if not existing:
+                    image_url = guess_food_image(food['description'], food.get('foodCategory'))
                     # Parse USDA data to FoodItemMaster (Simplified for brevity)
                     new_food = FoodItemMaster(
                         name=food['description'],
                         category=food.get('foodCategory'),
                         usda_fdc_id=food['fdcId'],
-                        data_source="usda"
-                        # ... map nutrients if available ...
+                        data_source="usda",
+                        image_url=image_url
                     )
                     db.add(new_food)
                     db.commit()
