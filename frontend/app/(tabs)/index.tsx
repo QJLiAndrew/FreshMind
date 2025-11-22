@@ -7,6 +7,7 @@ import api from '../../api'; // Import API helper
 import Config from '@/constants/Config';
 
 
+
 // Define what an Inventory Item looks like
 interface InventoryItem {
   inventory_id: string;

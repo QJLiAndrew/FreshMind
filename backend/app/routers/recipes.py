@@ -11,6 +11,7 @@ This module provides endpoints for:
 from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import List, Optional
 from datetime import timedelta
+from datetime import date as date_type
 
 from backend.app.database import get_db
 from backend.app.schemas import (
@@ -33,7 +34,10 @@ Helper functions for recipe router
 
 from decimal import Decimal
 from sqlalchemy.orm import Session, joinedload
-from backend.app.models import RecipeIngredient, RecipeMaster, Allergen, RecipeAllergen, UserInventory, FoodItemMaster
+from backend.app.models import (
+    RecipeIngredient, RecipeMaster, Allergen, RecipeAllergen,
+    UserInventory, FoodItemMaster, User
+)
 
 
 def calculate_recipe_nutrition(ingredients: list, servings: int) -> dict:
@@ -452,75 +456,119 @@ async def recommend_recipes_from_inventory(
         db: Session = Depends(get_db)
 ):
     """
-    **🎯 CORE FEATURE: Smart Recipe Recommendations**
-
-    Recommends recipes based on what's currently in the user's inventory.
-
-    **Returns:**
-    - List of recipes sorted by match score (highest first)
-    - Each includes: recipe details, match score, missing ingredients list
+    Smart Recipe Recommendations
+    - Filters by User Dietary Profile (Automatic)
+    - Filters by Request Parameters (Manual Override)
+    - Scores based on Inventory Availability
     """
-    from datetime import date as date_type
-    from uuid import UUID as UUID_type
+    print(f"\n🔍 --- RECIPE RECOMMENDATION DEBUG ---")
+    print(f"📥 Inputs: vegan={is_vegan}, gf={is_gluten_free}, halal={is_halal}")
+    # 1. FETCH USER PROFILE (Personalization)
+    try:
+        user_uuid = UUID(user_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid user_id format")
 
-    # 1. Get user's current inventory (non-expired items)
+    user = db.query(User).filter(User.user_id == user_uuid).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    print(f"👤 User Profile: vegan={user.is_vegan}, gf={user.is_gluten_free}")
+
+    # 2. GET USER INVENTORY (Non-expired items)
+    from datetime import date
+
     user_inventory = db.query(UserInventory).filter(
-        UserInventory.user_id == UUID_type(user_id),
-        UserInventory.expiry_date >= date_type.today()
+        UserInventory.user_id == user_uuid,
+        UserInventory.expiry_date >= date.today()
     ).options(
         joinedload(UserInventory.food_item)
     ).all()
 
-    if not user_inventory:
-        return []  # No inventory, no recommendations
+    print(f"DEBUG: Found {len(user_inventory)} inventory items for user.")
 
-    # Create set of available food_ids for fast lookup
+    if not user_inventory:
+        print("DEBUG: Inventory is empty! Returning 0 recommendations.")
+        return []
+
+    # Create lookup sets
     available_food_ids = set([str(item.food_id) for item in user_inventory])
 
-    # Also track which items are expiring soon (next 3 days) for prioritization
+    # Track expiring items (next 3 days) for bonus points
     expiring_soon_ids = set([
         str(item.food_id) for item in user_inventory
-        if item.expiry_date <= date_type.today() + timedelta(days=3)
+        if item.expiry_date <= date.today() + timedelta(days=3)
     ])
 
-    # 2. Build recipe query with optional filters
+    # 3. BUILD RECIPE QUERY
     query = db.query(RecipeMaster).options(
         joinedload(RecipeMaster.ingredients).joinedload(RecipeIngredient.food_item),
         joinedload(RecipeMaster.allergens)
     )
 
-    # Apply dietary filters if provided
+    total_recipes = query.count()
+    print(f"📚 Total Recipes in DB: {total_recipes}")
+
+    # --- APPLY AUTOMATIC USER PREFERENCES ---
+    # These act as "hard filters" - if you are Vegan, you ONLY see Vegan.
+    if user.is_vegan:
+        print("user is vegan")
+        query = query.filter(RecipeMaster.is_vegan == True)
+    if user.is_vegetarian:
+        print("user is vegetarian")
+        query = query.filter(RecipeMaster.is_vegetarian == True)
+    if user.is_gluten_free:
+        print("user is gluten_free")
+        query = query.filter(RecipeMaster.is_gluten_free == True)
+    if user.is_dairy_free:
+        print("user is dairy_free")
+        query = query.filter(RecipeMaster.is_dairy_free == True)
+    if user.is_halal:
+        print("user is halal")
+        query = query.filter(RecipeMaster.is_halal == True)
+    if user.is_kosher:
+        print("user is kosher")
+        query = query.filter(RecipeMaster.is_kosher == True)
+
+    # --- APPLY MANUAL FILTERS ---
+    # These allow refining the results further (e.g., "I want a Vegan Dinner")
     if meal_type:
         query = query.filter(RecipeMaster.meal_type == meal_type)
+
+    # If manual toggles are passed (overriding or adding to profile), apply them
     if is_vegan is not None:
+        print(f"   -> Applying Manual Filter: is_vegan={is_vegan}")
         query = query.filter(RecipeMaster.is_vegan == is_vegan)
     if is_vegetarian is not None:
+        print(f"   -> Applying Manual Filter: is_vegetarian={is_vegetarian}")
         query = query.filter(RecipeMaster.is_vegetarian == is_vegetarian)
     if is_halal is not None:
+        print(f"   -> Applying Manual Filter: is_halal={is_halal}")
         query = query.filter(RecipeMaster.is_halal == is_halal)
     if is_gluten_free is not None:
+        print(f"   -> Applying Manual Filter: is_gluten_free={is_gluten_free}")
         query = query.filter(RecipeMaster.is_gluten_free == is_gluten_free)
 
     recipes = query.all()
+    print(f"✅ Recipes remaining after filters: {len(recipes)}")
 
-    # 3. Calculate match score for each recipe
+    # 4. SCORING ALGORITHM
     recommendations = []
+
 
     for recipe in recipes:
         if not recipe.ingredients:
-            continue  # Skip recipes with no ingredients
+            print(f"DEBUG: No ingredients for recipe {recipe.ingredients}")
+            continue
 
         total_ingredients = len(recipe.ingredients)
 
-        # Count non-optional (required) ingredients
+        # Count non-optional ingredients
         required_ingredients = [ing for ing in recipe.ingredients if not ing.is_optional]
-        optional_ingredients = [ing for ing in recipe.ingredients if ing.is_optional]
 
-        # Count how many ingredients user has
         available_count = 0
         required_available = 0
         expiring_ingredient_count = 0
-
         missing_ingredients = []
 
         for ing in recipe.ingredients:
@@ -531,54 +579,66 @@ async def recommend_recipes_from_inventory(
                 if not ing.is_optional:
                     required_available += 1
 
-                # Bonus: Track if this uses expiring ingredients
+                # Bonus: Uses expiring item
                 if ing_food_id in expiring_soon_ids:
                     expiring_ingredient_count += 1
             else:
-                # Track missing ingredients
                 missing_ingredients.append(ing.food_item.name)
 
-        # Calculate match score (0-100)
-        # Base score: percentage of ingredients available
+        print(f"DEBUG: Scoring Recipe '{recipe.recipe_name}'...")
+        match_count = 0
+        for ing in recipe.ingredients:
+            ing_id = str(ing.food_id)
+            has_item = ing_id in available_food_ids
+            if has_item: match_count += 1
+            print(f"   - Ing: {ing.food_item.name} (ID: {ing_id}) -> Have? {has_item}")
+
+        # Calculate Base Score (0-100)
         base_match_score = (available_count / total_ingredients) * 100
 
-        # Bonus points for using expiring ingredients (up to +10%)
+        # Bonus: +10% max for using expiring food
         expiring_bonus = min((expiring_ingredient_count / total_ingredients) * 10, 10)
 
-        # Final match score
-        match_score = base_match_score + expiring_bonus
+        final_score = base_match_score + expiring_bonus
 
-        # Only include if meets minimum threshold
-        if match_score < min_match_score:
+        print(f"   -> Final Score: {final_score}% (Min required: {min_match_score}%)")
+
+        if final_score < min_match_score:
+            print("   -> SKIPPED (Score too low)")
             continue
 
-        # Also check if ALL required ingredients are available (important!)
+        # Filter by minimum score
+        if final_score < min_match_score:
+            continue
+
+        # Track required missing count
         required_missing = len(required_ingredients) - required_available
 
         recommendations.append({
             'recipe': format_recipe_response(recipe, db),
-            'match_score': round(match_score, 2),
+            'match_score': round(final_score, 2),
             'available_ingredients': available_count,
             'total_ingredients': total_ingredients,
             'missing_ingredients': missing_ingredients,
+            # Helper fields for sorting
             'required_missing': required_missing,
-            'uses_expiring_items': expiring_ingredient_count > 0
+            'uses_expiring': expiring_ingredient_count > 0
         })
 
-    # 4. Sort recommendations
-    # Priority 1: Recipes where ALL required ingredients are available
-    # Priority 2: Higher match score
-    # Priority 3: Uses expiring ingredients
+    # 5. SORTING
+    # Priority:
+    # 1. Can make it NOW (0 missing required ingredients)
+    # 2. Saves food (Uses expiring items)
+    # 3. High match score
     recommendations.sort(
         key=lambda x: (
-            x['required_missing'] == 0,  # Required ingredients available (True first)
-            x['match_score'],  # Higher score first
-            x['uses_expiring_items']  # Uses expiring items (True first)
+            x['required_missing'] == 0,  # True (1) comes before False (0)
+            x['uses_expiring'],
+            x['match_score']
         ),
         reverse=True
     )
 
-    # 5. Return top N recommendations
     return recommendations[:limit]
 
 

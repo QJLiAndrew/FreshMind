@@ -13,3 +13,4 @@ frontend/app/(tabs)/index.tsx
 frontend/api.tsx
 frontend/constants/Config.ts
 backend/seed_data.py
+backend/reset_data.py

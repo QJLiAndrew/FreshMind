@@ -6,6 +6,18 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
+import * as Notifications from 'expo-notifications';
+
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+    shouldShowBanner: true,
+    shouldShowList: true,
+  }),
+});
+
 export default function TabLayout() {
   const colorScheme = useColorScheme();
 
@@ -29,6 +41,14 @@ export default function TabLayout() {
           title: 'Grocery',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="cart.fill" color={color} />,
           // Note: Ensure 'cart.fill' is mapped in IconSymbol, or use 'bag.fill'
+        }}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: 'Profile',
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="person.crop.circle" color={color} />,
+          // Note: Ensure 'person.crop.circle' is mapped in IconSymbol to 'account-circle' or similar
         }}
       />
       <Tabs.Screen

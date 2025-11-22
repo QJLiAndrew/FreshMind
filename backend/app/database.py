@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     # USDA API (optional for now)
     usda_api_key: Optional[str] = None
 
+    # Test Data (Add this!)
+    test_user_id: Optional[str] = None
+
     class Config:
         # Explicit path to .env file
         env_file = str(BASE_DIR / ".env")
