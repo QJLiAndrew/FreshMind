@@ -1,36 +1,36 @@
-export const convertUnit = (quantity: number, unit: string, system: 'metric' | 'imperial') => {
+export const convertUnit = (quantity: number | string, unit: string, system: 'metric' | 'imperial') => {
+  // 1. Force conversion to number (Handle backend sending strings)
+  const qty = typeof quantity === 'string' ? parseFloat(quantity) : quantity;
+
+  // 2. If Metric, return as-is (but ensured as number)
   if (system === 'metric') {
-    return { quantity, unit };
+    return { quantity: qty, unit };
   }
 
-  // Imperial Conversions
-  // 1 g = 0.035274 oz
-  // 1 kg = 2.20462 lb
-  // 1 ml = 0.033814 fl oz
-
-  let newQuantity = quantity;
+  // 3. Imperial Conversions
+  let newQuantity = qty;
   let newUnit = unit;
 
   switch (unit.toLowerCase()) {
     case 'g':
     case 'gram':
     case 'grams':
-      newQuantity = quantity * 0.035274;
+      newQuantity = qty * 0.035274;
       newUnit = 'oz';
       break;
     case 'kg':
     case 'kilogram':
-      newQuantity = quantity * 2.20462;
+      newQuantity = qty * 2.20462;
       newUnit = 'lb';
       break;
     case 'ml':
     case 'milliliter':
-      newQuantity = quantity * 0.033814;
+      newQuantity = qty * 0.033814;
       newUnit = 'fl oz';
       break;
     case 'l':
     case 'liter':
-      newQuantity = quantity * 33.814;
+      newQuantity = qty * 33.814;
       newUnit = 'fl oz';
       break;
     default:
@@ -38,7 +38,7 @@ export const convertUnit = (quantity: number, unit: string, system: 'metric' | '
       break;
   }
 
-  // Round nicely (e.g. 12.05 oz)
+  // 4. Safe formatting
   return {
     quantity: parseFloat(newQuantity.toFixed(2)),
     unit: newUnit

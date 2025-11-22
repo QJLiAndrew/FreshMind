@@ -7,6 +7,8 @@ import api from '../../api'; // Import API helper
 import Config from '@/constants/Config';
 import { scheduleExpiryNotifications } from '@/utils/notifications';
 import * as Notifications from 'expo-notifications';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { convertUnit } from '@/utils/units';
 
 
 
@@ -30,20 +32,18 @@ export default function SmartFridgeScreen() {
   const router = useRouter();
   const theme = useTheme();
 
-  useEffect(() => {
-    const askPermission = async () => {
-      const { status } = await Notifications.getPermissionsAsync();
-      if (status !== 'granted') {
-        const { status: newStatus } = await Notifications.requestPermissionsAsync();
-        if (newStatus !== 'granted') {
-          // Optional: Handle refusal (e.g., show an alert)
-          console.log("Notification permission denied");
-        }
-      }
-    };
 
-    askPermission();
-  }, []);
+  const [unitSystem, setUnitSystem] = useState<'metric' | 'imperial'>('metric');
+  useFocusEffect(
+    useCallback(() => {
+      fetchInventory();
+      // Load Unit Preference
+      AsyncStorage.getItem('UNIT_PREFERENCE').then(val => {
+        if (val) setUnitSystem(val as 'metric' | 'imperial');
+      });
+    }, [])
+  );
+
 
   const fetchInventory = async () => {
     try {
@@ -79,57 +79,65 @@ export default function SmartFridgeScreen() {
     }
   };
 
-  const renderItem = ({ item }: { item: InventoryItem }) => (
-    <Card
-      style={styles.card}
-      onLongPress={() => deleteItem(item.inventory_id, item.food_name)}
-      onPress={() => router.push({
-        pathname: '/inventory/add_item',
-        params: {
-          inventoryId: item.inventory_id,
-          foodId: 'EXISTING', // Dummy value to bypass "Select Food" step
-          foodName: item.food_name,
-          initialQuantity: item.quantity.toString(),
-          initialUnit: item.unit,
-          initialLocation: item.storage_location,
-          initialExpiry: item.expiry_date
-        }
-      } as any)}
-    >
-      <Card.Content style={styles.cardContent}>
-        {/* Left: Image */}
-        {item.food_image_url ? (
-          <Image source={{ uri: item.food_image_url }} style={styles.foodImage} />
-        ) : (
-          <View style={[styles.foodImage, { backgroundColor: '#eee', justifyContent: 'center', alignItems: 'center' }]}>
-            <Text variant="labelLarge">?</Text>
+
+  const renderItem = ({ item }: { item: InventoryItem }) => {
+    // 1. Convert units based on user preference (Metric/Imperial)
+    const display = convertUnit(item.quantity, item.unit, unitSystem);
+
+    return (
+      <Card
+        style={styles.card}
+        // 2. Long Press to Delete
+        onLongPress={() => deleteItem(item.inventory_id, item.food_name)}
+        // 3. Tap to Edit (Passes current data to form)
+        onPress={() => router.push({
+          pathname: '/inventory/add_item',
+          params: {
+            inventoryId: item.inventory_id,
+            foodId: 'EXISTING', // Dummy ID to bypass search
+            foodName: item.food_name,
+            initialQuantity: item.quantity.toString(),
+            initialUnit: item.unit,
+            initialLocation: item.storage_location,
+            initialExpiry: item.expiry_date
+          }
+        } as any)}
+      >
+        <Card.Content style={styles.cardContent}>
+          {/* Left: Product Image or Placeholder */}
+          {item.food_image_url ? (
+            <Image source={{ uri: item.food_image_url }} style={styles.foodImage} />
+          ) : (
+            <View style={[styles.foodImage, { backgroundColor: '#eee', justifyContent: 'center', alignItems: 'center' }]}>
+              <Text variant="labelLarge">?</Text>
+            </View>
+          )}
+
+          {/* Center: Name & Quantity (Converted) */}
+          <View style={styles.infoContainer}>
+            <Text variant="titleMedium" numberOfLines={1}>{item.food_name}</Text>
+            <Text variant="bodyMedium" style={{ color: '#666' }}>
+              {display.quantity} {display.unit} • {item.storage_location || 'Fridge'}
+            </Text>
           </View>
-        )}
 
-        {/* Center: Info */}
-        <View style={styles.infoContainer}>
-          <Text variant="titleMedium" numberOfLines={1}>{item.food_name}</Text>
-          <Text variant="bodyMedium" style={{ color: '#666' }}>
-            {item.quantity} {item.unit} • {item.storage_location || 'Fridge'}
-          </Text>
-        </View>
-
-        <View style={{ alignItems: 'flex-end' }}>
-           <Chip
-             compact // <--- Added compact mode
-             textStyle={{ color: 'white', fontSize: 10 }}
-             // Removed 'height: 24' so it auto-sizes
-             style={{ backgroundColor: getStatusColor(item.freshness_status) }}
-           >
-             {item.days_until_expiry} days
-           </Chip>
-           <Text variant="labelSmall" style={{ marginTop: 4 }}>
-             {item.expiry_date}
-           </Text>
-        </View>
-      </Card.Content>
-    </Card>
-  );
+          {/* Right: Freshness Status Chip */}
+          <View style={{ alignItems: 'flex-end' }}>
+             <Chip
+               compact
+               textStyle={{ color: 'white', fontSize: 10 }}
+               style={{ backgroundColor: getStatusColor(item.freshness_status) }}
+             >
+               {item.days_until_expiry} days
+             </Chip>
+             <Text variant="labelSmall" style={{ marginTop: 4 }}>
+               {item.expiry_date}
+             </Text>
+          </View>
+        </Card.Content>
+      </Card>
+    );
+  };
 
   const deleteItem = (inventoryId: string, foodName: string) => {
     Alert.alert(
